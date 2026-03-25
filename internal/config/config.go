@@ -82,5 +82,5 @@ func DefaultAPIBaseURL() string {
 	if url := os.Getenv("GEARS_API_URL"); url != "" {
 		return url
 	}
-	return "https://gears-hub.ddev.site/api/v1"
+	return "https://mygears.dev/api/v1"
 }
