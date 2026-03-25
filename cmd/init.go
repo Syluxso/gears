@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"github.com/sylux/gears/internal/config"
 )
 
 //go:embed templates/.gears
@@ -28,59 +29,104 @@ func init() {
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
-	// Check if .gears already exists
-	if _, err := os.Stat(".gears"); !os.IsNotExist(err) {
-		return fmt.Errorf(".gears directory already exists in the current directory")
-	}
-
-	fmt.Println("Initializing .gears directory...")
-
-	// Walk through embedded templates and copy to current directory
-	err := fs.WalkDir(templateFS, "templates/.gears", func(path string, d fs.DirEntry, err error) error {
+	// Check if config already exists
+	if config.Exists() {
+		cfg, err := config.Load()
 		if err != nil {
-			return err
+			return fmt.Errorf("config exists but failed to load: %w", err)
 		}
-
-		// Calculate the relative path
-		relPath, err := filepath.Rel("templates", path)
-		if err != nil {
-			return err
-		}
-
-		if d.IsDir() {
-			// Create directory
-			if err := os.MkdirAll(relPath, 0755); err != nil {
-				return fmt.Errorf("failed to create directory %s: %w", relPath, err)
-			}
+		
+		fmt.Println("✓ .gears already initialized")
+		fmt.Printf("✓ Workspace ID: %s\n", cfg.WorkspaceID)
+		fmt.Printf("✓ API URL: %s\n", cfg.APIBaseURL)
+		if cfg.APIToken != "" {
+			fmt.Println("✓ Authenticated: Yes")
 		} else {
-			// Read file from embedded FS
-			content, err := fs.ReadFile(templateFS, path)
-			if err != nil {
-				return fmt.Errorf("failed to read template file %s: %w", path, err)
-			}
-
-			// Write file to disk
-			if err := os.WriteFile(relPath, content, 0644); err != nil {
-				return fmt.Errorf("failed to write file %s: %w", relPath, err)
-			}
-
-			fmt.Printf("  Created: %s\n", relPath)
+			fmt.Println("✓ Authenticated: No (run 'gears auth' to authenticate)")
 		}
-
 		return nil
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to initialize .gears: %w", err)
 	}
 
-	fmt.Println("\n✓ Successfully initialized .gears directory!")
-	fmt.Println("\nAgent: FIRST, read .gears/gears-init.md for complete onboarding instructions.")
-	fmt.Println("\nThen populate these key files:")
-	fmt.Println("  .gears/index.md          → Add project name, description, and project list")
-	fmt.Println("  .gears/memory/index.md   → Document tech stack and architecture")
-	fmt.Println("  .gears/instructions/index.md → Define coding standards and commands")
-	fmt.Println("  .gears/context/index.md  → Set current phase and active work")
+	// Check if .gears directory exists
+	gearsExists := false
+	if _, err := os.Stat(".gears"); !os.IsNotExist(err) {
+		gearsExists = true
+		fmt.Println("Found existing .gears directory, adding config.json...")
+	} else {
+		fmt.Println("Initializing .gears directory...")
+	}
+
+	// Only copy templates if .gears directory doesn't exist
+	if !gearsExists {
+		// Walk through embedded templates and copy to current directory
+		err := fs.WalkDir(templateFS, "templates/.gears", func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+
+			// Calculate the relative path
+			relPath, err := filepath.Rel("templates", path)
+			if err != nil {
+				return err
+			}
+
+			if d.IsDir() {
+				// Create directory
+				if err := os.MkdirAll(relPath, 0755); err != nil {
+					return fmt.Errorf("failed to create directory %s: %w", relPath, err)
+				}
+			} else {
+				// Read file from embedded FS
+				content, err := fs.ReadFile(templateFS, path)
+				if err != nil {
+					return fmt.Errorf("failed to read template file %s: %w", path, err)
+				}
+
+				// Write file to disk
+				if err := os.WriteFile(relPath, content, 0644); err != nil {
+					return fmt.Errorf("failed to write file %s: %w", relPath, err)
+				}
+
+				fmt.Printf("  Created: %s\n", relPath)
+			}
+
+			return nil
+		})
+
+		if err != nil {
+			return fmt.Errorf("failed to initialize .gears: %w", err)
+		}
+	}
+
+	// Generate and save workspace ID in config.json
+	workspaceID := config.GenerateWorkspaceID()
+	cfg := &config.Config{
+		WorkspaceID: workspaceID,
+		APIBaseURL:  config.DefaultAPIBaseURL(),
+	}
+
+	if err := cfg.Save(); err != nil {
+		return fmt.Errorf("failed to save config: %w", err)
+	}
+
+	fmt.Println()
+	if gearsExists {
+		fmt.Println("✓ Added config.json to existing .gears directory!")
+	} else {
+		fmt.Println("✓ Successfully initialized .gears directory!")
+	}
+	fmt.Printf("✓ Generated workspace ID: %s\n", workspaceID)
+	
+	if !gearsExists {
+		fmt.Println("\nAgent: FIRST, read .gears/gears-init.md for complete onboarding instructions.")
+		fmt.Println("\nThen populate these key files:")
+		fmt.Println("  .gears/index.md          → Add project name, description, and project list")
+		fmt.Println("  .gears/memory/index.md   → Document tech stack and architecture")
+		fmt.Println("  .gears/instructions/index.md → Define coding standards and commands")
+		fmt.Println("  .gears/context/index.md  → Set current phase and active work")
+	} else {
+		fmt.Println("\nNext step: Run 'gears auth' to connect to gears-hub")
+	}
 
 	return nil
 }
