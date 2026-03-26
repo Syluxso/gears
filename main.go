@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/sylux/gears/cmd"
+	"github.com/Syluxso/gears/cmd"
 )
 
 func main() {

@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"github.com/sylux/gears/internal/config"
+	"github.com/Syluxso/gears/internal/config"
 )
 
 //go:embed templates/.gears

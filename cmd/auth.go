@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/sylux/gears/internal/config"
+	"github.com/Syluxso/gears/internal/config"
 )
 
 var authCmd = &cobra.Command{
