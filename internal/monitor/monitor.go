@@ -157,6 +157,9 @@ func (m *Monitor) checkFileChanges() {
 				totalChanges,
 				pluralize(totalChanges))
 		}
+
+		// Detect local commit history movement even when there are no file changes.
+		_ = m.detectAndLogLocalCommits(projectPath, project)
 	}
 
 	if changedProjects == 0 && m.config.Verbose {
@@ -301,6 +304,7 @@ func (m *Monitor) detectNewCommits(projectPath, projectName, projectUUID string)
 			Message:     parts[3],
 			Timestamp:   parts[4],
 			Branch:      currentBranch,
+			Source:      "remote",
 		}
 
 		// Log each commit as event
@@ -313,4 +317,93 @@ func (m *Monitor) detectNewCommits(projectPath, projectName, projectUUID string)
 	}
 
 	return commitCount
+}
+
+func (m *Monitor) detectAndLogLocalCommits(projectPath string, project db.Project) int {
+	currentBranch, currentHash, currentDate, err := getCurrentGitState(projectPath)
+	if err != nil || currentHash == "" {
+		return 0
+	}
+
+	// First observation: set baseline without creating historical backfill noise.
+	if strings.TrimSpace(project.GitLastCommitHash) == "" {
+		_ = db.UpdateProjectGitState(project.UUID, currentBranch, currentHash, currentDate)
+		return 0
+	}
+
+	if strings.TrimSpace(project.GitLastCommitHash) == currentHash {
+		return 0
+	}
+
+	logCmd := exec.Command("git", "log", project.GitLastCommitHash+".."+currentHash, "--format=%H|%an|%ae|%s|%ai")
+	logCmd.Dir = projectPath
+	output, err := logCmd.Output()
+	if err != nil {
+		// History may have been rewritten; move baseline forward.
+		_ = db.UpdateProjectGitState(project.UUID, currentBranch, currentHash, currentDate)
+		return 0
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	commitCount := 0
+
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+
+		parts := strings.SplitN(line, "|", 5)
+		if len(parts) != 5 {
+			continue
+		}
+
+		commitData := events.GitCommitData{
+			CommitHash:  parts[0],
+			Author:      parts[1],
+			AuthorEmail: parts[2],
+			Message:     parts[3],
+			Timestamp:   parts[4],
+			Branch:      currentBranch,
+			Source:      "local",
+		}
+
+		_ = events.LogEvent(db.GetDB(), events.EventGitCommit, events.GetWorkspaceUUID(), project.UUID, commitData)
+		commitCount++
+	}
+
+	_ = db.UpdateProjectGitState(project.UUID, currentBranch, currentHash, currentDate)
+	return commitCount
+}
+
+func getCurrentGitState(projectPath string) (string, string, *time.Time, error) {
+	branchCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	branchCmd.Dir = projectPath
+	branchOutput, err := branchCmd.Output()
+	if err != nil {
+		return "", "", nil, err
+	}
+
+	hashCmd := exec.Command("git", "rev-parse", "HEAD")
+	hashCmd.Dir = projectPath
+	hashOutput, err := hashCmd.Output()
+	if err != nil {
+		return "", "", nil, err
+	}
+
+	dateCmd := exec.Command("git", "log", "-1", "--format=%cI")
+	dateCmd.Dir = projectPath
+	dateOutput, err := dateCmd.Output()
+	if err != nil {
+		return strings.TrimSpace(string(branchOutput)), strings.TrimSpace(string(hashOutput)), nil, nil
+	}
+
+	dateStr := strings.TrimSpace(string(dateOutput))
+	var commitDate *time.Time
+	if dateStr != "" {
+		if parsed, err := time.Parse(time.RFC3339, dateStr); err == nil {
+			commitDate = &parsed
+		}
+	}
+
+	return strings.TrimSpace(string(branchOutput)), strings.TrimSpace(string(hashOutput)), commitDate, nil
 }

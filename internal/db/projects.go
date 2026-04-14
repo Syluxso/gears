@@ -352,6 +352,18 @@ func UpdateProjectActivity(projectUUID string, activityTime time.Time) error {
 	return err
 }
 
+// UpdateProjectGitState updates cached git state for a project by UUID.
+func UpdateProjectGitState(projectUUID, branch, commitHash string, commitDate *time.Time) error {
+	query := `
+		UPDATE projects
+		SET git_current_branch = ?, git_last_commit_hash = ?, git_last_commit_date = ?, last_scanned_at = ?
+		WHERE uuid = ?
+	`
+
+	_, err := db.Exec(query, branch, commitHash, commitDate, time.Now(), projectUUID)
+	return err
+}
+
 // getAllProjects retrieves all projects from the database
 func getAllProjects() ([]Project, error) {
 	query := `

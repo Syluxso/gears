@@ -48,6 +48,7 @@ type GitCommitData struct {
 	AuthorEmail string `json:"author_email"`
 	Timestamp   string `json:"timestamp"`
 	Branch      string `json:"branch"`
+	Source      string `json:"source,omitempty"`
 }
 
 // GitFetchData represents git fetch event data
