@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Syluxso/gears/internal/content"
+	"github.com/Syluxso/gears/internal/db"
 	"github.com/spf13/cobra"
 )
 
@@ -19,7 +21,7 @@ var storyCmd = &cobra.Command{
 var storyNewCmd = &cobra.Command{
 	Use:   "new <name>",
 	Short: "Create a new story file with template",
-	Long: `Creates a new story file in .gears/story/ using the format story-<name>.md.
+	Long: `Creates a new story file in .gears/story/ using the format story--<name>.md.
 	
 The story file includes a template with sections for description, acceptance criteria, and technical notes.`,
 	Args: cobra.ExactArgs(1),
@@ -53,8 +55,20 @@ func runStoryNew(cmd *cobra.Command, args []string) error {
 
 	// Get story name and create filename
 	name := args[0]
-	slug := strings.ToLower(strings.ReplaceAll(name, " ", "-"))
-	storyFile := filepath.Join(storyDir, "story-"+slug+".md")
+	slug := content.NormalizeSlug(name)
+	storyFile, err := content.BuildDefaultFilePath(content.TypeStory, slug)
+	if err != nil {
+		return err
+	}
+
+	if err := db.Initialize(); err != nil {
+		return fmt.Errorf("failed to initialize database: %w", err)
+	}
+
+	item, err := content.CreateItem(db.GetDB(), content.TypeStory, "md", name, slug, "pending", storyFile)
+	if err != nil {
+		return fmt.Errorf("failed to create story metadata: %w", err)
+	}
 
 	// Check if file already exists
 	if _, err := os.Stat(storyFile); err == nil {
@@ -63,7 +77,7 @@ func runStoryNew(cmd *cobra.Command, args []string) error {
 
 	// Create story file with template
 	today := time.Now().Format("2006-01-02")
-	content := fmt.Sprintf(`# Story: %s
+	storyTemplate := fmt.Sprintf(`# Story: %s
 
 **Status:** Draft
 **Project:** _[project name]_
@@ -93,9 +107,13 @@ _[Architectural considerations, constraints, approach decisions, related ADRs.]_
 - Artifact: _[link if applicable]_
 `, name, today)
 
-	if err := os.WriteFile(storyFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(storyFile, []byte(storyTemplate), 0644); err != nil {
+		_ = content.SyncFromFiles(db.GetDB())
 		return fmt.Errorf("failed to create story file: %w", err)
 	}
+
+	_ = content.SyncFromFiles(db.GetDB())
+	_ = content.UpdateSyncMetadata(db.GetDB(), item.UUID, "")
 
 	fmt.Printf("✓ Created story: %s\n", storyFile)
 	fmt.Println("\nAgent next:")
@@ -122,10 +140,12 @@ func runStoryList(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf(".gears/story directory not found")
 	}
 
-	// Read all story files
-	files, err := os.ReadDir(storyDir)
-	if err != nil {
-		return fmt.Errorf("failed to read story directory: %w", err)
+	if err := db.Initialize(); err != nil {
+		return fmt.Errorf("failed to initialize database: %w", err)
+	}
+
+	if err := content.SyncFromFiles(db.GetDB()); err != nil {
+		return fmt.Errorf("failed to sync stories: %w", err)
 	}
 
 	// Group stories by status
@@ -137,44 +157,16 @@ func runStoryList(cmd *cobra.Command, args []string) error {
 
 	var stories []Story
 
-	for _, file := range files {
-		if file.IsDir() || !strings.HasPrefix(file.Name(), "story-") {
-			continue
-		}
+	items, err := content.GetByType(db.GetDB(), content.TypeStory)
+	if err != nil {
+		return fmt.Errorf("failed to query stories: %w", err)
+	}
 
-		filePath := filepath.Join(storyDir, file.Name())
-		content, err := os.ReadFile(filePath)
-		if err != nil {
-			continue
-		}
-
-		// Parse story name and status from content
-		lines := strings.Split(string(content), "\n")
-		var name, status string
-
-		for _, line := range lines {
-			if strings.HasPrefix(line, "# Story:") {
-				name = strings.TrimSpace(strings.TrimPrefix(line, "# Story:"))
-			}
-			if strings.HasPrefix(line, "**Status:**") {
-				status = strings.TrimSpace(strings.TrimPrefix(line, "**Status:**"))
-			}
-			if name != "" && status != "" {
-				break
-			}
-		}
-
-		if name == "" {
-			name = file.Name()
-		}
-		if status == "" {
-			status = "Unknown"
-		}
-
+	for _, item := range items {
 		stories = append(stories, Story{
-			Name:   name,
-			Status: status,
-			File:   file.Name(),
+			Name:   item.Label,
+			Status: item.State,
+			File:   filepath.Base(item.FilePath),
 		})
 	}
 
@@ -193,11 +185,11 @@ func runStoryList(cmd *cobra.Command, args []string) error {
 
 	for _, story := range stories {
 		switch strings.ToLower(story.Status) {
-		case "in progress":
+		case "in progress", "in_progress", "current":
 			inProgressStories = append(inProgressStories, story)
 		case "ready":
 			activeStories = append(activeStories, story)
-		case "queued", "draft":
+		case "queued", "draft", "pending", "planning", "created":
 			queuedStories = append(queuedStories, story)
 		case "done", "completed":
 			completedStories = append(completedStories, story)

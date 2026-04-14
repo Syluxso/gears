@@ -154,6 +154,26 @@ func Initialize() error {
 	CREATE INDEX IF NOT EXISTS idx_inbox_is_read ON inbox(is_read);
 	CREATE INDEX IF NOT EXISTS idx_inbox_level ON inbox(level);
 	CREATE INDEX IF NOT EXISTS idx_inbox_created_at ON inbox(created_at);
+
+	CREATE TABLE IF NOT EXISTS content_items (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		uuid TEXT UNIQUE NOT NULL,
+		type TEXT NOT NULL,
+		file_type TEXT NOT NULL DEFAULT 'md',
+		label TEXT NOT NULL,
+		slug TEXT NOT NULL,
+		state TEXT NOT NULL,
+		file_path TEXT UNIQUE NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		last_synced_hash TEXT,
+		last_synced_at DATETIME
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_content_items_type ON content_items(type);
+	CREATE INDEX IF NOT EXISTS idx_content_items_state ON content_items(state);
+	CREATE INDEX IF NOT EXISTS idx_content_items_slug ON content_items(slug);
+	CREATE INDEX IF NOT EXISTS idx_content_items_file_path ON content_items(file_path);
 	`
 
 	if _, err := db.Exec(schema); err != nil {

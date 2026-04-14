@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Syluxso/gears/internal/content"
+	"github.com/Syluxso/gears/internal/db"
 	"github.com/spf13/cobra"
 )
 
@@ -19,7 +21,7 @@ var adrCmd = &cobra.Command{
 var adrNewCmd = &cobra.Command{
 	Use:   "new <name>",
 	Short: "Create a new ADR file with template",
-	Long: `Creates a new ADR file in .gears/artifacts/ using the format adr-<name>.md.
+	Long: `Creates a new ADR file in .gears/artifacts/ using the format adr--<name>.md.
 
 ADRs document WORKING code patterns extracted from real implementations, not theoretical designs.`,
 	Args: cobra.ExactArgs(1),
@@ -53,8 +55,20 @@ func runAdrNew(cmd *cobra.Command, args []string) error {
 
 	// Get ADR name and create filename
 	name := args[0]
-	slug := strings.ToLower(strings.ReplaceAll(name, " ", "-"))
-	adrFile := filepath.Join(artifactsDir, "adr-"+slug+".md")
+	slug := content.NormalizeSlug(name)
+	adrFile, err := content.BuildDefaultFilePath(content.TypeADR, slug)
+	if err != nil {
+		return err
+	}
+
+	if err := db.Initialize(); err != nil {
+		return fmt.Errorf("failed to initialize database: %w", err)
+	}
+
+	item, err := content.CreateItem(db.GetDB(), content.TypeADR, "md", name, slug, "created", adrFile)
+	if err != nil {
+		return fmt.Errorf("failed to create ADR metadata: %w", err)
+	}
 
 	// Check if file already exists
 	if _, err := os.Stat(adrFile); err == nil {
@@ -63,7 +77,7 @@ func runAdrNew(cmd *cobra.Command, args []string) error {
 
 	// Create ADR file with template
 	today := time.Now().Format("2006-01-02")
-	content := fmt.Sprintf(`# %s
+	adrTemplate := fmt.Sprintf(`# %s
 
 **Documented:** %s
 **Status:** Draft
@@ -83,9 +97,9 @@ _[Description of the feature]_
 
 #### Implementation
 
-` + "```" + `[language]
+`+"```"+`[language]
 // Code example showing the implementation
-` + "```" + `
+`+"```"+`
 
 ### 2. _[Feature Name]_
 
@@ -96,8 +110,8 @@ _[Description of the feature]_
 _[If applicable - tables, columns, relationships]_
 
 **Tables**:
-- ` + "`" + `table_name` + "`" + ` - Description
-  - ` + "`" + `column_name` + "`" + ` - Type - Description
+- `+"`"+`table_name`+"`"+` - Description
+  - `+"`"+`column_name`+"`"+` - Type - Description
 
 ## Usage Patterns
 
@@ -105,9 +119,9 @@ _[How other code uses this system. Common patterns and best practices.]_
 
 #### Example Usage
 
-` + "```" + `[language]
+`+"```"+`[language]
 // Code example showing usage
-` + "```" + `
+`+"```"+`
 
 ## Key Decisions
 
@@ -119,9 +133,13 @@ _[Important architectural or implementation choices and why they were made]_
 - Documentation: _[external docs if applicable]_
 `, name, today)
 
-	if err := os.WriteFile(adrFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(adrFile, []byte(adrTemplate), 0644); err != nil {
+		_ = content.SyncFromFiles(db.GetDB())
 		return fmt.Errorf("failed to create ADR file: %w", err)
 	}
+
+	_ = content.SyncFromFiles(db.GetDB())
+	_ = content.UpdateSyncMetadata(db.GetDB(), item.UUID, "")
 
 	fmt.Printf("✓ Created ADR: %s\n\n", adrFile)
 	fmt.Println("Agent next: Document a WORKING system by interviewing the user.")
@@ -153,25 +171,40 @@ func runAdrList(cmd *cobra.Command, args []string) error {
 	}
 
 	artifactsDir := filepath.Join(".gears", "artifacts")
-	entries, err := os.ReadDir(artifactsDir)
+	if _, err := os.Stat(artifactsDir); os.IsNotExist(err) {
+		return fmt.Errorf(".gears/artifacts directory not found")
+	}
+
+	if err := db.Initialize(); err != nil {
+		return fmt.Errorf("failed to initialize database: %w", err)
+	}
+
+	if err := content.SyncFromFiles(db.GetDB()); err != nil {
+		return fmt.Errorf("failed to sync ADRs: %w", err)
+	}
+
+	items, err := content.GetByType(db.GetDB(), content.TypeADR)
 	if err != nil {
-		return fmt.Errorf("failed to read artifacts directory: %w", err)
+		return fmt.Errorf("failed to query ADRs: %w", err)
 	}
 
 	var adrFiles []string
 	var exampleFiles []string
 
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
+	entries, err := os.ReadDir(artifactsDir)
+	if err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+			if strings.HasPrefix(entry.Name(), "adr_example-") {
+				exampleFiles = append(exampleFiles, entry.Name())
+			}
 		}
+	}
 
-		name := entry.Name()
-		if strings.HasPrefix(name, "adr_example-") {
-			exampleFiles = append(exampleFiles, name)
-		} else if strings.HasPrefix(name, "adr-") && name != "adr_template.md" {
-			adrFiles = append(adrFiles, name)
-		}
+	for _, item := range items {
+		adrFiles = append(adrFiles, filepath.Base(item.FilePath))
 	}
 
 	fmt.Println()
@@ -192,7 +225,10 @@ func runAdrList(cmd *cobra.Command, args []string) error {
 	if len(adrFiles) > 0 {
 		fmt.Printf("📋 Project ADRs (%d):\n", len(adrFiles))
 		for _, file := range adrFiles {
-			displayName := strings.TrimPrefix(file, "adr-")
+			displayName := strings.TrimPrefix(file, "adr--")
+			if displayName == file {
+				displayName = strings.TrimPrefix(file, "adr-")
+			}
 			displayName = strings.TrimSuffix(displayName, ".md")
 			fmt.Printf("  - %s\n", displayName)
 		}
