@@ -7,8 +7,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/spf13/cobra"
 	"github.com/Syluxso/gears/internal/config"
+	"github.com/Syluxso/gears/internal/db"
+	"github.com/spf13/cobra"
 )
 
 //go:embed templates/.gears
@@ -35,7 +36,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("config exists but failed to load: %w", err)
 		}
-		
+
 		fmt.Println("✓ .gears already initialized")
 		fmt.Printf("✓ Workspace ID: %s\n", cfg.WorkspaceID)
 		fmt.Printf("✓ API URL: %s\n", cfg.APIBaseURL)
@@ -51,7 +52,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	gearsExists := false
 	if _, err := os.Stat(".gears"); !os.IsNotExist(err) {
 		gearsExists = true
-		fmt.Println("Found existing .gears directory, adding config.json...")
+		fmt.Println("Found existing .gears directory, adding .gearbox/config.json...")
 	} else {
 		fmt.Println("Initializing .gears directory...")
 	}
@@ -98,7 +99,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Generate and save workspace ID in config.json
+	// Generate and save workspace ID in .gearbox/config.json
 	workspaceID := config.GenerateWorkspaceID()
 	cfg := &config.Config{
 		WorkspaceID: workspaceID,
@@ -109,14 +110,41 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to save config: %w", err)
 	}
 
+	// Initialize database
+	if err := db.Initialize(); err != nil {
+		fmt.Printf("Warning: failed to initialize database: %v\n", err)
+	}
+
+	// Scan and populate projects table
+	fmt.Println("\nScanning projects directory...")
+	if err := db.ScanAndPopulateProjects(); err != nil {
+		fmt.Printf("Warning: failed to scan projects: %v\n", err)
+	} else {
+		// Get active projects to show summary
+		projects, err := db.GetActiveProjects()
+		if err == nil && len(projects) > 0 {
+			fmt.Printf("✓ Found %d project(s):\n", len(projects))
+			for _, p := range projects {
+				framework := p.Framework
+				if framework == "" {
+					framework = p.Language
+				}
+				fmt.Printf("  - %s (%s)\n", p.Name, framework)
+			}
+		}
+	}
+
+	// Close database connection
+	_ = db.Close()
+
 	fmt.Println()
 	if gearsExists {
-		fmt.Println("✓ Added config.json to existing .gears directory!")
+		fmt.Println("✓ Added .gearbox/config.json to existing .gears directory!")
 	} else {
 		fmt.Println("✓ Successfully initialized .gears directory!")
 	}
 	fmt.Printf("✓ Generated workspace ID: %s\n", workspaceID)
-	
+
 	if !gearsExists {
 		fmt.Println("\nAgent: FIRST, read .gears/gears-init.md for complete onboarding instructions.")
 		fmt.Println("\nThen populate these key files:")

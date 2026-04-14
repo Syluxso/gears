@@ -10,14 +10,14 @@ import (
 	"github.com/google/uuid"
 )
 
-const ConfigFileName = ".gears/config.json"
+const ConfigFileName = ".gears/.gearbox/config.json"
 
-// Config represents the .gears/config.json structure
+// Config represents the .gears/.gearbox/config.json structure
 type Config struct {
-	WorkspaceID  string    `json:"workspace_id"`
-	APIBaseURL   string    `json:"api_base_url"`
-	APIToken     string    `json:"api_token,omitempty"`
-	LastSync     time.Time `json:"last_sync,omitempty"`
+	WorkspaceID string    `json:"workspace_id"`
+	APIBaseURL  string    `json:"api_base_url"`
+	APIToken    string    `json:"api_token,omitempty"`
+	LastSync    time.Time `json:"last_sync,omitempty"`
 }
 
 // Load reads the config file from disk
@@ -40,9 +40,9 @@ func Load() (*Config, error) {
 
 // Save writes the config to disk
 func (c *Config) Save() error {
-	// Ensure .gears directory exists
+	// Ensure .gears/.gearbox directory exists
 	if err := os.MkdirAll(filepath.Dir(ConfigFileName), 0755); err != nil {
-		return fmt.Errorf("failed to create .gears directory: %w", err)
+		return fmt.Errorf("failed to create .gears/.gearbox directory: %w", err)
 	}
 
 	data, err := json.MarshalIndent(c, "", "  ")

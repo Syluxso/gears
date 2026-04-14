@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/cobra"
 	"github.com/Syluxso/gears/internal/config"
+	"github.com/spf13/cobra"
 )
 
 var syncPushCmd = &cobra.Command{
@@ -77,8 +77,8 @@ func runSyncPush(cmd *cobra.Command, args []string) error {
 			return nil
 		}
 
-		// Skip config.json
-		if path == ".gears"+string(filepath.Separator)+"config.json" {
+		// Skip .gearbox directory (config and system files)
+		if strings.HasPrefix(path, ".gears"+string(filepath.Separator)+".gearbox") {
 			return nil
 		}
 

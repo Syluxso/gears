@@ -10,8 +10,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/Syluxso/gears/internal/config"
+	"github.com/spf13/cobra"
 )
 
 var authCmd = &cobra.Command{
@@ -23,7 +23,7 @@ This command will:
 1. Open your browser to the token creation page
 2. Prompt you to paste your API token
 3. Validate the token
-4. Store it securely in .gears/config.json
+4. Store it securely in .gears/.gearbox/config.json
 
 Required token abilities: files:read, files:write`,
 	RunE: runAuth,

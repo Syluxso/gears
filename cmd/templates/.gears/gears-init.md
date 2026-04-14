@@ -100,24 +100,25 @@ Feature specification registry. One file per feature. **Write the story before s
 
 Reference ideas, implementation blueprints, schema definitions, config templates. Check here before building a new pattern.
 
-### `.gears/_gearbox/`
+### `.gears/.gearbox/`
 
 Tooling to render and package `.gears` docs as a static HTML site.
 
-- Renderer: `_gearbox/scripts/render_gears.py`
-- Build helper: `_gearbox/scripts/build_gears_site.ps1`
-- Zip helper: `_gearbox/scripts/zip_gears_site.ps1`
+- Renderer: `.gearbox/scripts/render_gears.py`
+- Build helper: `.gearbox/scripts/build_gears_site.ps1`
+- Zip helper: `.gearbox/scripts/zip_gears_site.ps1`
 - Dependency: `Markdown>=3.7`
-- Output: `_gearbox/site/`
-- Package: `_gearbox/dist/gears-site-YYYYMMDD-HHMMSS.zip`
+- Output: `.gearbox/site/`
+- Package: `.gearbox/dist/gears-site-YYYYMMDD-HHMMSS.zip`
+- Config: `.gearbox/config.json` (workspace ID and API settings)
 
 Python environment notes:
 
 - Workspace virtual environment: `/.venv/` at the workspace root
 - Activate before building: PowerShell: `& .\.venv\Scripts\Activate.ps1` / Git Bash: `source .venv/Scripts/activate`
-- Install dependency: `python -m pip install -r .gears/_gearbox/requirements.txt`
+- Install dependency: `python -m pip install -r .gears/.gearbox/requirements.txt`
 - Build script auto-detects `.venv`; falls back to `python` in PATH
-- Renderer excludes `_gearbox` from the crawl when generating the site
+- Renderer excludes `.gearbox` from the crawl when generating the site
 
 ---
 
@@ -312,12 +313,12 @@ If a human asks for browsable docs output:
 1. Activate workspace `.venv`:
    - PowerShell: `& .\.venv\Scripts\Activate.ps1`
    - Git Bash: `source .venv/Scripts/activate`
-2. Install renderer dependency: `python -m pip install -r .gears/_gearbox/requirements.txt`
+2. Install renderer dependency: `python -m pip install -r .gears/.gearbox/requirements.txt`
 3. Build site:
-   - Helper script: `.\.gears\_gearbox\scripts\build_gears_site.ps1 -Title "My Project Gears"`
-   - Manual: `python .gears/_gearbox/scripts/render_gears.py --source .gears --output .gears/_gearbox/site --title "My Project Gears"`
-4. Optionally zip: `.\.gears\_gearbox\scripts\zip_gears_site.ps1`
-5. Share zip from `.gears/_gearbox/dist/`
+   - Helper script: `.\.gears\.gearbox\scripts\build_gears_site.ps1 -Title "My Project Gears"`
+   - Manual: `python .gears/.gearbox/scripts/render_gears.py --source .gears --output .gears/.gearbox/site --title "My Project Gears"`
+4. Optionally zip: `.\.gears\.gearbox\scripts\zip_gears_site.ps1`
+5. Share zip from `.gears/.gearbox/dist/`
 
 ---
 
