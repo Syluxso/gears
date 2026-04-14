@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/Syluxso/gears/internal/config"
 	_ "modernc.org/sqlite"
 )
 
@@ -127,6 +128,7 @@ func Initialize() error {
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
 		event_type TEXT NOT NULL,
+		workspace_uuid TEXT,
 		project_uuid TEXT,
 		data TEXT,
 		synced_at DATETIME
@@ -136,11 +138,103 @@ func Initialize() error {
 	CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp);
 	CREATE INDEX IF NOT EXISTS idx_events_project ON events(project_uuid);
 	CREATE INDEX IF NOT EXISTS idx_events_synced ON events(synced_at);
+
+	CREATE TABLE IF NOT EXISTS inbox (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		level TEXT NOT NULL,
+		title TEXT NOT NULL,
+		message TEXT NOT NULL,
+		suggested_command TEXT,
+		metadata TEXT,
+		is_read BOOLEAN DEFAULT 0,
+		read_at DATETIME,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_inbox_is_read ON inbox(is_read);
+	CREATE INDEX IF NOT EXISTS idx_inbox_level ON inbox(level);
+	CREATE INDEX IF NOT EXISTS idx_inbox_created_at ON inbox(created_at);
 	`
 
 	if _, err := db.Exec(schema); err != nil {
 		return fmt.Errorf("failed to create schema: %w", err)
 	}
+
+	// Migrate older databases that predate workspace_uuid on events table.
+	if err := ensureEventsWorkspaceUUIDColumn(); err != nil {
+		return fmt.Errorf("failed to migrate events table: %w", err)
+	}
+
+	if err := ensureInboxLevelConstraint(); err != nil {
+		return fmt.Errorf("failed to migrate inbox table: %w", err)
+	}
+
+	return nil
+}
+
+func ensureEventsWorkspaceUUIDColumn() error {
+	if db == nil {
+		return nil
+	}
+
+	rows, err := db.Query("PRAGMA table_info(events)")
+	if err != nil {
+		return fmt.Errorf("failed to inspect events table: %w", err)
+	}
+	defer rows.Close()
+
+	hasWorkspaceUUID := false
+	for rows.Next() {
+		var cid int
+		var name, colType string
+		var notNull int
+		var dflt sql.NullString
+		var pk int
+
+		if err := rows.Scan(&cid, &name, &colType, &notNull, &dflt, &pk); err != nil {
+			return fmt.Errorf("failed to scan events table info: %w", err)
+		}
+
+		if name == "workspace_uuid" {
+			hasWorkspaceUUID = true
+			break
+		}
+	}
+
+	if !hasWorkspaceUUID {
+		if _, err := db.Exec("ALTER TABLE events ADD COLUMN workspace_uuid TEXT"); err != nil {
+			return fmt.Errorf("failed to add workspace_uuid column: %w", err)
+		}
+	}
+
+	if _, err := db.Exec("CREATE INDEX IF NOT EXISTS idx_events_workspace ON events(workspace_uuid)"); err != nil {
+		return fmt.Errorf("failed to create events workspace index: %w", err)
+	}
+
+	// Backfill old rows created before workspace_uuid existed.
+	if cfg, err := config.Load(); err == nil && cfg.WorkspaceID != "" {
+		if _, err := db.Exec(
+			"UPDATE events SET workspace_uuid = ? WHERE workspace_uuid IS NULL OR workspace_uuid = ''",
+			cfg.WorkspaceID,
+		); err != nil {
+			// Best-effort only. Another running process may temporarily lock the DB.
+			// New events will still include workspace_uuid.
+		}
+	}
+
+	return nil
+}
+
+func ensureInboxLevelConstraint() error {
+	if db == nil {
+		return nil
+	}
+
+	// Best-effort normalization for older rows.
+	_, _ = db.Exec("UPDATE inbox SET level = LOWER(level) WHERE level IS NOT NULL")
+
+	// Backfill empty/NULL levels to info to avoid invalid records.
+	_, _ = db.Exec("UPDATE inbox SET level = 'info' WHERE level IS NULL OR level = ''")
 
 	return nil
 }

@@ -184,10 +184,11 @@ Examples:
 
 			// Create output object
 			output := map[string]interface{}{
-				"timestamp":    e.Timestamp.Format(time.RFC3339),
-				"event_type":   e.EventType,
-				"project_uuid": e.ProjectUUID,
-				"data":         dataMap,
+				"timestamp":      e.Timestamp.Format(time.RFC3339),
+				"event_type":     e.EventType,
+				"workspace_uuid": e.WorkspaceUUID,
+				"project_uuid":   e.ProjectUUID,
+				"data":           dataMap,
 			}
 
 			jsonBytes, _ := json.Marshal(output)

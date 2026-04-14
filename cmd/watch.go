@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Syluxso/gears/internal/agent"
 	"github.com/Syluxso/gears/internal/db"
 	"github.com/Syluxso/gears/internal/events"
 	"github.com/Syluxso/gears/internal/monitor"
@@ -60,6 +61,13 @@ Similar to: php artisan serve, ionic serve, npm run dev`,
 			return fmt.Errorf("failed to initialize database: %w", err)
 		}
 
+		createdInstructions, err := agent.EnsureCopilotInstructions()
+		if err != nil {
+			fmt.Printf("Warning: failed to ensure .github/copilot-instructions.md: %v\n", err)
+		} else if createdInstructions {
+			fmt.Println("✓ Created .github/copilot-instructions.md with Agent Inbox directive")
+		}
+
 		// Scan and populate projects
 		fmt.Println("📁 Scanning projects directory...")
 		if err := db.ScanAndPopulateProjects(); err != nil {
@@ -84,7 +92,7 @@ Similar to: php artisan serve, ionic serve, npm run dev`,
 				"git_fetch":    "8m",
 			},
 		}
-		_ = events.LogEvent(db.GetDB(), events.EventWatchStart, "", watchData)
+		_ = events.LogEvent(db.GetDB(), events.EventWatchStart, events.GetWorkspaceUUID(), "", watchData)
 
 		fmt.Println("✓ Watch started")
 
@@ -122,7 +130,7 @@ Similar to: php artisan serve, ionic serve, npm run dev`,
 		stopData := events.WatchData{
 			Reason: "user_requested",
 		}
-		_ = events.LogEvent(db.GetDB(), events.EventWatchStop, "", stopData)
+		_ = events.LogEvent(db.GetDB(), events.EventWatchStop, events.GetWorkspaceUUID(), "", stopData)
 
 		os.Remove(statusFile)
 

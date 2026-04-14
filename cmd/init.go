@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/Syluxso/gears/internal/agent"
 	"github.com/Syluxso/gears/internal/config"
 	"github.com/Syluxso/gears/internal/db"
 	"github.com/spf13/cobra"
@@ -37,6 +38,11 @@ func runInit(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("config exists but failed to load: %w", err)
 		}
 
+		createdInstructions, err := agent.EnsureCopilotInstructions()
+		if err != nil {
+			fmt.Printf("Warning: failed to ensure .github/copilot-instructions.md: %v\n", err)
+		}
+
 		fmt.Println("✓ .gears already initialized")
 		fmt.Printf("✓ Workspace ID: %s\n", cfg.WorkspaceID)
 		fmt.Printf("✓ API URL: %s\n", cfg.APIBaseURL)
@@ -44,6 +50,9 @@ func runInit(cmd *cobra.Command, args []string) error {
 			fmt.Println("✓ Authenticated: Yes")
 		} else {
 			fmt.Println("✓ Authenticated: No (run 'gears auth' to authenticate)")
+		}
+		if createdInstructions {
+			fmt.Println("✓ Created .github/copilot-instructions.md with Agent Inbox directive")
 		}
 		return nil
 	}
@@ -137,6 +146,11 @@ func runInit(cmd *cobra.Command, args []string) error {
 	// Close database connection
 	_ = db.Close()
 
+	createdInstructions, err := agent.EnsureCopilotInstructions()
+	if err != nil {
+		fmt.Printf("Warning: failed to ensure .github/copilot-instructions.md: %v\n", err)
+	}
+
 	fmt.Println()
 	if gearsExists {
 		fmt.Println("✓ Added .gearbox/config.json to existing .gears directory!")
@@ -144,6 +158,9 @@ func runInit(cmd *cobra.Command, args []string) error {
 		fmt.Println("✓ Successfully initialized .gears directory!")
 	}
 	fmt.Printf("✓ Generated workspace ID: %s\n", workspaceID)
+	if createdInstructions {
+		fmt.Println("✓ Created .github/copilot-instructions.md with Agent Inbox directive")
+	}
 
 	if !gearsExists {
 		fmt.Println("\nAgent: FIRST, read .gears/gears-init.md for complete onboarding instructions.")

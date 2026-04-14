@@ -148,7 +148,7 @@ func (m *Monitor) checkFileChanges() {
 				ProjectUUID:  project.UUID,
 				FilesChanged: changeCount,
 			}
-			_ = events.LogEvent(db.GetDB(), events.EventFileChange, project.UUID, eventData)
+			_ = events.LogEvent(db.GetDB(), events.EventFileChange, events.GetWorkspaceUUID(), project.UUID, eventData)
 
 			// Show activity indicator
 			totalChanges := m.projectChangeCount[project.Name]
@@ -244,7 +244,7 @@ func (m *Monitor) fetchGitUpdates() {
 			Remote:     "origin",
 			NewCommits: newCommits,
 		}
-		_ = events.LogEvent(db.GetDB(), events.EventGitFetch, project.UUID, eventData)
+		_ = events.LogEvent(db.GetDB(), events.EventGitFetch, events.GetWorkspaceUUID(), project.UUID, eventData)
 	}
 
 	if fetchedCount > 0 {
@@ -304,7 +304,7 @@ func (m *Monitor) detectNewCommits(projectPath, projectName, projectUUID string)
 		}
 
 		// Log each commit as event
-		_ = events.LogEvent(db.GetDB(), events.EventGitCommit, projectUUID, commitData)
+		_ = events.LogEvent(db.GetDB(), events.EventGitCommit, events.GetWorkspaceUUID(), projectUUID, commitData)
 		commitCount++
 	}
 

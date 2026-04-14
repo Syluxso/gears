@@ -300,7 +300,7 @@ func insertProject(project *Project) error {
 			Language:    project.Language,
 			Framework:   project.Framework,
 		}
-		_ = events.LogEvent(db, events.EventProjectAdded, project.UUID, eventData)
+		_ = events.LogEvent(db, events.EventProjectAdded, events.GetWorkspaceUUID(), project.UUID, eventData)
 	}
 
 	return err
@@ -328,7 +328,7 @@ func markProjectRemoved(projectID int64, projectUUID, projectName, projectPath s
 			Project: projectName,
 			Path:    projectPath,
 		}
-		_ = events.LogEvent(db, events.EventProjectRemoved, projectUUID, eventData)
+		_ = events.LogEvent(db, events.EventProjectRemoved, events.GetWorkspaceUUID(), projectUUID, eventData)
 	}
 
 	return err

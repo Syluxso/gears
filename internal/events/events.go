@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/Syluxso/gears/internal/config"
 )
 
 // Event types
@@ -21,12 +23,13 @@ const (
 
 // Event represents a workspace event
 type Event struct {
-	ID          int64
-	Timestamp   time.Time
-	EventType   string
-	ProjectUUID string
-	Data        string // JSON blob
-	SyncedAt    *time.Time
+	ID            int64
+	Timestamp     time.Time
+	EventType     string
+	WorkspaceUUID string
+	ProjectUUID   string
+	Data          string // JSON blob
+	SyncedAt      *time.Time
 }
 
 // FileChangeData represents file change event data
@@ -82,7 +85,7 @@ type CommandData struct {
 }
 
 // LogEvent logs an event to the database
-func LogEvent(db *sql.DB, eventType, projectUUID string, data interface{}) error {
+func LogEvent(db *sql.DB, eventType, workspaceUUID, projectUUID string, data interface{}) error {
 	if db == nil {
 		return nil // Silently skip if database not initialized
 	}
@@ -99,11 +102,11 @@ func LogEvent(db *sql.DB, eventType, projectUUID string, data interface{}) error
 
 	// Insert event
 	query := `
-		INSERT INTO events (timestamp, event_type, project_uuid, data)
-		VALUES (?, ?, ?, ?)
+		INSERT INTO events (timestamp, event_type, workspace_uuid, project_uuid, data)
+		VALUES (?, ?, ?, ?, ?)
 	`
 
-	_, err := db.Exec(query, time.Now(), eventType, projectUUID, dataJSON)
+	_, err := db.Exec(query, time.Now(), eventType, workspaceUUID, projectUUID, dataJSON)
 	if err != nil {
 		return fmt.Errorf("failed to insert event: %w", err)
 	}
@@ -117,7 +120,7 @@ func GetEvents(db *sql.DB, limit int, eventType, projectUUID string, since, unti
 		return nil, fmt.Errorf("database not initialized")
 	}
 
-	query := "SELECT id, timestamp, event_type, project_uuid, data, synced_at FROM events WHERE 1=1"
+	query := "SELECT id, timestamp, event_type, workspace_uuid, project_uuid, data, synced_at FROM events WHERE 1=1"
 	args := []interface{}{}
 
 	if eventType != "" {
@@ -157,10 +160,15 @@ func GetEvents(db *sql.DB, limit int, eventType, projectUUID string, since, unti
 	for rows.Next() {
 		var e Event
 		var syncedAt sql.NullTime
+		var workspaceUUID sql.NullString
 
-		err := rows.Scan(&e.ID, &e.Timestamp, &e.EventType, &e.ProjectUUID, &e.Data, &syncedAt)
+		err := rows.Scan(&e.ID, &e.Timestamp, &e.EventType, &workspaceUUID, &e.ProjectUUID, &e.Data, &syncedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan event: %w", err)
+		}
+
+		if workspaceUUID.Valid {
+			e.WorkspaceUUID = workspaceUUID.String
 		}
 
 		if syncedAt.Valid {
@@ -217,7 +225,7 @@ func GetUnsyncedEvents(db *sql.DB, limit int) ([]Event, error) {
 	}
 
 	query := `
-		SELECT id, timestamp, event_type, project_uuid, data, synced_at 
+		SELECT id, timestamp, event_type, workspace_uuid, project_uuid, data, synced_at 
 		FROM events 
 		WHERE synced_at IS NULL 
 		ORDER BY id ASC
@@ -245,10 +253,15 @@ func GetUnsyncedEvents(db *sql.DB, limit int) ([]Event, error) {
 	for rows.Next() {
 		var e Event
 		var syncedAt sql.NullTime
+		var workspaceUUID sql.NullString
 
-		err := rows.Scan(&e.ID, &e.Timestamp, &e.EventType, &e.ProjectUUID, &e.Data, &syncedAt)
+		err := rows.Scan(&e.ID, &e.Timestamp, &e.EventType, &workspaceUUID, &e.ProjectUUID, &e.Data, &syncedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan event: %w", err)
+		}
+
+		if workspaceUUID.Valid {
+			e.WorkspaceUUID = workspaceUUID.String
 		}
 
 		if syncedAt.Valid {
@@ -290,4 +303,14 @@ func MarkEventsSynced(db *sql.DB, eventIDs []int64) error {
 	}
 
 	return nil
+}
+
+// GetWorkspaceUUID retrieves the workspace UUID from config
+// Returns empty string if config doesn't exist or can't be loaded
+func GetWorkspaceUUID() string {
+	cfg, err := config.Load()
+	if err != nil {
+		return "" // Silently return empty if config not found
+	}
+	return cfg.WorkspaceID
 }
