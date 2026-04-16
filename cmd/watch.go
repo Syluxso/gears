@@ -65,7 +65,7 @@ Similar to: php artisan serve, ionic serve, npm run dev`,
 		if err != nil {
 			fmt.Printf("Warning: failed to ensure .github/copilot-instructions.md: %v\n", err)
 		} else if createdInstructions {
-			fmt.Println("✓ Created .github/copilot-instructions.md with Agent Inbox directive")
+			fmt.Println("✓ Created .github/copilot-instructions.md with Agent Hydration directive")
 		}
 
 		// Scan and populate projects

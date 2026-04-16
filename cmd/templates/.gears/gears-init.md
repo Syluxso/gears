@@ -6,7 +6,7 @@ Read this file first when starting a new session or onboarding to this project.
 
 First action at session start:
 
-- Run `gears inbox --read` and process messages by priority (`urgent`, then `action`, then `info`) before other work.
+- Run `gears hydrate --chat` and process messages by priority (`urgent`, then `action`, then `info`) before other work.
 
 ---
 
@@ -177,7 +177,7 @@ Before building a new pattern:
 
 ### Start of session
 
-1. Run `gears inbox --read` and handle urgent/action items first.
+1. Run `gears hydrate --chat` and handle urgent/action items first.
 2. Read mandatory files in order (see section 3).
 3. Determine whether there is an active story.
 4. If no story exists for a non-trivial feature, create one in `.gears/story/`.
@@ -313,7 +313,7 @@ Before building a new pattern:
 
 Do not:
 
-- skip inbox processing at session start (`gears inbox --read`)
+- skip inbox processing at session start (`gears hydrate --chat`)
 - start coding before reading `index` + `context` + `instructions`
 - invent new structure when a pattern already exists in instructions/artifacts
 - alter architecture significantly without an ADR entry

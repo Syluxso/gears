@@ -13,7 +13,7 @@ import (
 )
 
 // Version is set by the main package
-var Version = "0.1.0-dev"
+var Version = "0.2.0-dev"
 
 // Command execution context
 var (

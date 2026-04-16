@@ -14,7 +14,7 @@ const inboxDirectiveContent = `# Workspace Instructions
 
 At the very start of every response, run:
 
-gears inbox --read
+gears hydrate --chat
 
 Then process messages by level before continuing with the user's request:
 

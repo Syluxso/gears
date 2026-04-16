@@ -15,8 +15,9 @@ import (
 )
 
 const (
-	TypeStory = "story"
-	TypeADR   = "adr"
+	TypeStory   = "story"
+	TypeADR     = "adr"
+	TypeSession = "session"
 
 	StateMissingFile = "missing_file"
 )
@@ -62,6 +63,8 @@ func BuildDefaultFilePath(contentType, slug string) (string, error) {
 		return filepath.Join(".gears", "story", "story--"+slug+".md"), nil
 	case TypeADR:
 		return filepath.Join(".gears", "artifacts", "adr--"+slug+".md"), nil
+	case TypeSession:
+		return filepath.Join(".gears", "sessions", slug+".md"), nil
 	default:
 		return "", fmt.Errorf("unsupported content type: %s", contentType)
 	}
@@ -188,6 +191,9 @@ func SyncFromFiles(db *sql.DB) error {
 	if err := backfillType(db, TypeADR); err != nil {
 		return err
 	}
+	if err := backfillType(db, TypeSession); err != nil {
+		return err
+	}
 
 	if err := markMissingAndNotify(db); err != nil {
 		return err
@@ -202,9 +208,13 @@ func backfillType(db *sql.DB, contentType string) error {
 	if contentType == TypeStory {
 		dir = filepath.Join(".gears", "story")
 		prefixes = []string{"story--", "story-"}
-	} else {
+	} else if contentType == TypeADR {
 		dir = filepath.Join(".gears", "artifacts")
 		prefixes = []string{"adr--", "adr-"}
+	} else if contentType == TypeSession {
+		dir = filepath.Join(".gears", "sessions")
+	} else {
+		return fmt.Errorf("unsupported content type for backfill: %s", contentType)
 	}
 
 	entries, err := os.ReadDir(dir)
@@ -225,15 +235,31 @@ func backfillType(db *sql.DB, contentType string) error {
 			continue
 		}
 
-		matched := false
-		for _, prefix := range prefixes {
-			if strings.HasPrefix(name, prefix) {
-				matched = true
-				break
+		if contentType == TypeSession {
+			if filepath.Ext(name) != ".md" {
+				continue
+			}
+			if strings.EqualFold(name, "index.md") {
+				continue
+			}
+
+			base := strings.TrimSuffix(name, filepath.Ext(name))
+			if _, err := time.Parse("2006-01-02", base); err != nil {
+				continue
 			}
 		}
-		if !matched {
-			continue
+
+		if len(prefixes) > 0 {
+			matched := false
+			for _, prefix := range prefixes {
+				if strings.HasPrefix(name, prefix) {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				continue
+			}
 		}
 
 		filePath := filepath.ToSlash(filepath.Join(dir, name))
@@ -374,6 +400,9 @@ func parseFileMetadata(filePath, contentType string) (label, state, fileHash str
 		if contentType == TypeStory && strings.HasPrefix(trimmed, "# Story:") {
 			label = strings.TrimSpace(strings.TrimPrefix(trimmed, "# Story:"))
 		}
+		if contentType == TypeSession && strings.HasPrefix(trimmed, "# Session:") {
+			label = strings.TrimSpace(strings.TrimPrefix(trimmed, "# Session:"))
+		}
 		if contentType == TypeADR && strings.HasPrefix(trimmed, "# ") {
 			label = strings.TrimSpace(strings.TrimPrefix(trimmed, "# "))
 		}
@@ -388,6 +417,8 @@ func parseFileMetadata(filePath, contentType string) (label, state, fileHash str
 	if strings.TrimSpace(state) == "" {
 		if contentType == TypeStory {
 			state = "pending"
+		} else if contentType == TypeSession {
+			state = "logged"
 		} else {
 			state = "created"
 		}
@@ -413,6 +444,9 @@ func inferSlugFromFilename(filename, contentType string) string {
 		if strings.HasPrefix(base, "adr-") {
 			return NormalizeSlug(strings.TrimPrefix(base, "adr-"))
 		}
+	}
+	if contentType == TypeSession {
+		return NormalizeSlug(base)
 	}
 
 	return NormalizeSlug(base)

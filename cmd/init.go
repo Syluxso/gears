@@ -52,7 +52,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 			fmt.Println("✓ Authenticated: No (run 'gears auth' to authenticate)")
 		}
 		if createdInstructions {
-			fmt.Println("✓ Created .github/copilot-instructions.md with Agent Inbox directive")
+			fmt.Println("✓ Created .github/copilot-instructions.md with Agent Hydration directive")
 		}
 		return nil
 	}
@@ -159,7 +159,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Printf("✓ Generated workspace ID: %s\n", workspaceID)
 	if createdInstructions {
-		fmt.Println("✓ Created .github/copilot-instructions.md with Agent Inbox directive")
+		fmt.Println("✓ Created .github/copilot-instructions.md with Agent Hydration directive")
 	}
 
 	if !gearsExists {
