@@ -76,6 +76,15 @@ func Initialize() error {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
 
+	// SQLite is file-backed; keeping a single connection prevents cross-connection
+	// schema locks during startup migrations.
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+
+	if _, err := db.Exec("PRAGMA busy_timeout = 5000"); err != nil {
+		return fmt.Errorf("failed to set sqlite busy timeout: %w", err)
+	}
+
 	// Create schema if it doesn't exist
 	schema := `
 	CREATE TABLE IF NOT EXISTS command_log (
@@ -201,7 +210,6 @@ func ensureEventsWorkspaceUUIDColumn() error {
 	if err != nil {
 		return fmt.Errorf("failed to inspect events table: %w", err)
 	}
-	defer rows.Close()
 
 	hasWorkspaceUUID := false
 	for rows.Next() {
@@ -217,8 +225,16 @@ func ensureEventsWorkspaceUUIDColumn() error {
 
 		if name == "workspace_uuid" {
 			hasWorkspaceUUID = true
-			break
 		}
+	}
+
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return fmt.Errorf("failed to read events table info: %w", err)
+	}
+
+	if err := rows.Close(); err != nil {
+		return fmt.Errorf("failed to close events table info cursor: %w", err)
 	}
 
 	if !hasWorkspaceUUID {

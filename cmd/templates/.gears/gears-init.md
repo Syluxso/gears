@@ -4,6 +4,10 @@ Purpose: provide a single, practical initialization guide so a new agent can bec
 
 Read this file first when starting a new session or onboarding to this project.
 
+First action at session start:
+
+- Run `gears inbox --read` and process messages by priority (`urgent`, then `action`, then `info`) before other work.
+
 ---
 
 ## 1) What Gears Is
@@ -39,8 +43,8 @@ When starting any session, read in this order:
 3. `.gears/memory/index.md`
 4. `.gears/instructions/index.md`
 5. Latest `.gears/sessions/YYYY-MM-DD.md`
-6. Relevant `.gears/story/story-*.md` (if any active story)
-7. Relevant `.gears/artifacts/*.md` for pattern references
+6. Relevant `.gears/story/story--*.md` (if any active story)
+7. Relevant `.gears/artifacts/adr--*.md` and related `.gears/artifacts/*.md` references
 
 Fast mental model:
 
@@ -96,9 +100,19 @@ Use the latest session to avoid duplicate work.
 
 Feature specification registry. One file per feature. **Write the story before starting implementation.**
 
+Current default filename convention:
+
+- `story--<slug>.md` (double dash)
+- Legacy `story-<slug>.md` files may still exist and should remain readable
+
 ### `.gears/artifacts/`
 
 Reference ideas, implementation blueprints, schema definitions, config templates. Check here before building a new pattern.
+
+ADR files currently use:
+
+- `adr--<slug>.md` (double dash)
+- Legacy `adr-<slug>.md` files may still exist and should remain readable
 
 ### `.gears/.gearbox/`
 
@@ -163,10 +177,11 @@ Before building a new pattern:
 
 ### Start of session
 
-1. Read mandatory files in order (see section 3).
-2. Determine whether there is an active story.
-3. If no story exists for a non-trivial feature, create one in `.gears/story/`.
-4. Pull relevant artifact references.
+1. Run `gears inbox --read` and handle urgent/action items first.
+2. Read mandatory files in order (see section 3).
+3. Determine whether there is an active story.
+4. If no story exists for a non-trivial feature, create one in `.gears/story/`.
+5. Pull relevant artifact references.
 
 ### During implementation
 
@@ -298,6 +313,7 @@ Before building a new pattern:
 
 Do not:
 
+- skip inbox processing at session start (`gears inbox --read`)
 - start coding before reading `index` + `context` + `instructions`
 - invent new structure when a pattern already exists in instructions/artifacts
 - alter architecture significantly without an ADR entry
@@ -306,7 +322,20 @@ Do not:
 
 ---
 
-## 12) Optional: Building Documentation Site
+## 12) Content Metadata Model (DB-First)
+
+For stories and ADRs:
+
+- Database is the source of truth for metadata (type, slug, state, timestamps, paths)
+- Markdown file is the source of truth for rich content/body
+- Listing and indexing should prefer DB metadata over file parsing
+- Missing file policy: if metadata exists but file is missing, set `state` to `missing_file` and create an inbox `action` notice
+
+This keeps discovery and status reliable even when files are moved, deleted, or backfilled.
+
+---
+
+## 13) Optional: Building Documentation Site
 
 If a human asks for browsable docs output:
 

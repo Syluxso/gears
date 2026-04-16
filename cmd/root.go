@@ -7,6 +7,7 @@ import (
 
 	"github.com/Syluxso/gears/internal/config"
 	"github.com/Syluxso/gears/internal/db"
+	"github.com/Syluxso/gears/internal/events"
 	"github.com/Syluxso/gears/internal/workspace"
 	"github.com/spf13/cobra"
 )
@@ -39,8 +40,12 @@ and humans maintain shared project understanding across sessions.`,
 			cmdFullPath = cmd.Name()
 		}
 
-		// Skip workspace discovery for init command (creates .gears)
-		if cmd.Name() != "init" {
+		// Skip workspace discovery for init and workspace registry commands.
+		skipWorkspaceDiscovery := cmd.Name() == "init" ||
+			cmd.Name() == "workspace" ||
+			(cmd.Parent() != nil && cmd.Parent().Name() == "workspace")
+
+		if !skipWorkspaceDiscovery {
 			// Find workspace root by traversing up from CWD
 			workspaceRoot, err := workspace.FindWorkspaceRoot()
 			if err != nil {
@@ -119,6 +124,15 @@ func Execute() error {
 
 	// Log to database (ignore errors to not disrupt command execution)
 	_ = db.LogCommand(log)
+
+	// Also emit a command event into the activity stream.
+	_ = events.LogEvent(db.GetDB(), events.EventCommand, events.GetWorkspaceUUID(), "", events.CommandData{
+		Command:    cmdName,
+		Args:       db.ArgsToJSON(cmdArgs),
+		ExitCode:   exitCode,
+		DurationMS: duration,
+		CWD:        cwd,
+	})
 
 	// Close database connection
 	_ = db.Close()
