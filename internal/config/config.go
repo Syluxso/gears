@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,6 +19,7 @@ type Config struct {
 	APIBaseURL  string    `json:"api_base_url"`
 	APIToken    string    `json:"api_token,omitempty"`
 	LastSync    time.Time `json:"last_sync,omitempty"`
+	AgentName   string    `json:"agent_name,omitempty"`
 }
 
 // Load reads the config file from disk
@@ -83,4 +85,23 @@ func DefaultAPIBaseURL() string {
 		return url
 	}
 	return "https://mygears.dev/api/v1"
+}
+
+// GetDefaultAgentName returns the persisted agent name for this workspace, if set.
+func GetDefaultAgentName() string {
+	if cfg, err := Load(); err == nil && cfg.AgentName != "" {
+		return cfg.AgentName
+	}
+	return ""
+}
+
+// SetDefaultAgentName persists the default agent identity for this workspace.
+func SetDefaultAgentName(name string) error {
+	cfg, err := Load()
+	if err != nil {
+		// Allow setting even if config doesn't exist yet (rare, init should have run)
+		cfg = &Config{}
+	}
+	cfg.AgentName = strings.TrimSpace(name)
+	return cfg.Save()
 }

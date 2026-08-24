@@ -183,6 +183,27 @@ func Initialize() error {
 	CREATE INDEX IF NOT EXISTS idx_content_items_state ON content_items(state);
 	CREATE INDEX IF NOT EXISTS idx_content_items_slug ON content_items(slug);
 	CREATE INDEX IF NOT EXISTS idx_content_items_file_path ON content_items(file_path);
+
+	CREATE TABLE IF NOT EXISTS backlog_items (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		uuid TEXT UNIQUE NOT NULL,
+		label TEXT NOT NULL,
+		slug TEXT NOT NULL,
+		status TEXT NOT NULL DEFAULT 'pending',
+		sort_order INTEGER NOT NULL DEFAULT 0,
+		reference_type TEXT,
+		reference_slug TEXT,
+		claimed_by TEXT,
+		claimed_at DATETIME,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		completed_at DATETIME
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_backlog_status ON backlog_items(status);
+	CREATE INDEX IF NOT EXISTS idx_backlog_sort_order ON backlog_items(sort_order);
+	CREATE INDEX IF NOT EXISTS idx_backlog_slug ON backlog_items(slug);
+	CREATE INDEX IF NOT EXISTS idx_backlog_claimed_by ON backlog_items(claimed_by);
 	`
 
 	if _, err := db.Exec(schema); err != nil {

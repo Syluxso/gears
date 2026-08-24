@@ -12,8 +12,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Version is set by the main package
-var Version = "0.2.0-dev"
+// Version is set by the main package (see main.go and version.go).
+// This is a fallback default.
+var Version = "0.3.0-dev"
 
 // Command execution context
 var (
@@ -40,10 +41,12 @@ and humans maintain shared project understanding across sessions.`,
 			cmdFullPath = cmd.Name()
 		}
 
-		// Skip workspace discovery for init and workspace registry commands.
+		// Skip workspace discovery for init, workspace, and ionic commands.
 		skipWorkspaceDiscovery := cmd.Name() == "init" ||
 			cmd.Name() == "workspace" ||
-			(cmd.Parent() != nil && cmd.Parent().Name() == "workspace")
+			(cmd.Parent() != nil && cmd.Parent().Name() == "workspace") ||
+			cmd.Name() == "ionic" ||
+			(cmd.Parent() != nil && cmd.Parent().Name() == "ionic")
 
 		if !skipWorkspaceDiscovery {
 			// Find workspace root by traversing up from CWD

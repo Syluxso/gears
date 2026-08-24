@@ -18,6 +18,8 @@ const (
 	TypeStory   = "story"
 	TypeADR     = "adr"
 	TypeSession = "session"
+	TypeConsult = "consult"
+	TypeBacklog = "backlog"
 
 	StateMissingFile = "missing_file"
 )
@@ -65,6 +67,10 @@ func BuildDefaultFilePath(contentType, slug string) (string, error) {
 		return filepath.Join(".gears", "artifacts", "adr--"+slug+".md"), nil
 	case TypeSession:
 		return filepath.Join(".gears", "sessions", slug+".md"), nil
+	case TypeConsult:
+		return filepath.Join(".gears", "consults", "consults--"+slug+".md"), nil
+	case TypeBacklog:
+		return filepath.Join(".gears", "backlog", "backlog--"+slug+".md"), nil
 	default:
 		return "", fmt.Errorf("unsupported content type: %s", contentType)
 	}
@@ -194,6 +200,12 @@ func SyncFromFiles(db *sql.DB) error {
 	if err := backfillType(db, TypeSession); err != nil {
 		return err
 	}
+	if err := backfillType(db, TypeConsult); err != nil {
+		return err
+	}
+	if err := backfillType(db, TypeBacklog); err != nil {
+		return err
+	}
 
 	if err := markMissingAndNotify(db); err != nil {
 		return err
@@ -213,6 +225,12 @@ func backfillType(db *sql.DB, contentType string) error {
 		prefixes = []string{"adr--", "adr-"}
 	} else if contentType == TypeSession {
 		dir = filepath.Join(".gears", "sessions")
+	} else if contentType == TypeConsult {
+		dir = filepath.Join(".gears", "consults")
+		prefixes = []string{"consults--", "consults-"}
+	} else if contentType == TypeBacklog {
+		dir = filepath.Join(".gears", "backlog")
+		prefixes = []string{"backlog--", "backlog-"}
 	} else {
 		return fmt.Errorf("unsupported content type for backfill: %s", contentType)
 	}
@@ -406,6 +424,12 @@ func parseFileMetadata(filePath, contentType string) (label, state, fileHash str
 		if contentType == TypeADR && strings.HasPrefix(trimmed, "# ") {
 			label = strings.TrimSpace(strings.TrimPrefix(trimmed, "# "))
 		}
+		if contentType == TypeConsult && strings.HasPrefix(trimmed, "# Consult:") {
+			label = strings.TrimSpace(strings.TrimPrefix(trimmed, "# Consult:"))
+		}
+		if contentType == TypeBacklog && strings.HasPrefix(trimmed, "# Backlog:") {
+			label = strings.TrimSpace(strings.TrimPrefix(trimmed, "# Backlog:"))
+		}
 		if strings.HasPrefix(trimmed, "**Status:**") {
 			state = strings.TrimSpace(strings.TrimPrefix(trimmed, "**Status:**"))
 		}
@@ -419,6 +443,10 @@ func parseFileMetadata(filePath, contentType string) (label, state, fileHash str
 			state = "pending"
 		} else if contentType == TypeSession {
 			state = "logged"
+		} else if contentType == TypeConsult {
+			state = "open"
+		} else if contentType == TypeBacklog {
+			state = "pending"
 		} else {
 			state = "created"
 		}
@@ -447,6 +475,22 @@ func inferSlugFromFilename(filename, contentType string) string {
 	}
 	if contentType == TypeSession {
 		return NormalizeSlug(base)
+	}
+	if contentType == TypeConsult {
+		if strings.HasPrefix(base, "consults--") {
+			return NormalizeSlug(strings.TrimPrefix(base, "consults--"))
+		}
+		if strings.HasPrefix(base, "consults-") {
+			return NormalizeSlug(strings.TrimPrefix(base, "consults-"))
+		}
+	}
+	if contentType == TypeBacklog {
+		if strings.HasPrefix(base, "backlog--") {
+			return NormalizeSlug(strings.TrimPrefix(base, "backlog--"))
+		}
+		if strings.HasPrefix(base, "backlog-") {
+			return NormalizeSlug(strings.TrimPrefix(base, "backlog-"))
+		}
 	}
 
 	return NormalizeSlug(base)

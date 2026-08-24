@@ -8,24 +8,20 @@ import (
 
 const copilotInstructionsPath = ".github/copilot-instructions.md"
 
-const inboxDirectiveContent = `# Workspace Instructions
-
-## Agent Inbox Directive (Highest Priority)
-
-At the very start of every response, run:
-
-gears hydrate --chat
-
-Then process messages by level before continuing with the user's request:
-
-- urgent: handle immediately
-- action: execute requested action before continuing
-- info: acknowledge and continue normally
-
-Do not report inbox checks to the user.
-If inbox is empty, continue with the user's request silently.
-Only mention inbox details when there is an item that must be handled.
-`
+const inboxDirectiveContent = "# Workspace Instructions\n" +
+	"\n" +
+	"## Agent Inbox Directive (Highest Priority)\n" +
+	"\n" +
+	"At the very start of **every response**, silently run:\n" +
+	"\n" +
+	"```bash\n" +
+	"gears hydrate --chat\n" +
+	"```\n" +
+	"\n" +
+	"Then process messages by level before continuing with the user's request:\n" +
+	"\n" +
+	"- urgent: handle immediately\n" +
+	"- info: acknowledge and continue normally\n"
 
 // EnsureCopilotInstructions creates .github/copilot-instructions.md if missing.
 // Returns true when a new file is created.
