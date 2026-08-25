@@ -50,7 +50,19 @@ Then use it:
 The board URL and username are stored in .gears/.gearbox/config.json.
 The API token is stored in .gears/.gearbox/config-local.json (gitignored),
 or read from the KANBOARD_API_TOKEN environment variable.`,
+	// Without this, an unrecognised subcommand falls through to RunE and is
+	// silently ignored - so a typo prints the status banner and looks like it
+	// worked. Reject unknown args instead.
+	Args: cobra.NoArgs,
 	RunE: runKanRoot,
+}
+
+var kanInfoCmd = &cobra.Command{
+	Use:     "info",
+	Aliases: []string{"status"},
+	Short:   "Show the configured connection and verify it works",
+	Args:    cobra.NoArgs,
+	RunE:    func(cmd *cobra.Command, args []string) error { return kanStatus() },
 }
 
 func init() {
@@ -61,8 +73,8 @@ func init() {
 	kanCmd.Flags().StringVar(&kanUsername, "username", "", "Set the API username (default: jsonrpc)")
 	kanCmd.Flags().Lookup("set-api-key").NoOptDefVal = promptSentinel
 
-	kanCmd.AddCommand(kanProjectsCmd, kanColumnsCmd, kanTasksCmd, kanShowCmd,
-		kanSearchCmd, kanNewCmd, kanMoveCmd, kanEditCmd, kanTagCmd,
+	kanCmd.AddCommand(kanInfoCmd, kanProjectsCmd, kanColumnsCmd, kanTasksCmd,
+		kanShowCmd, kanSearchCmd, kanNewCmd, kanMoveCmd, kanEditCmd, kanTagCmd,
 		kanCommentCmd, kanCloseCmd, kanReopenCmd, kanRemoveCmd)
 
 	kanTasksCmd.Flags().BoolVar(&kanShowClose, "closed", false, "Show closed tasks instead of open ones")
