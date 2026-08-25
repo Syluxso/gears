@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Syluxso/gears/internal/db"
+	"github.com/Syluxso/gears/internal/toolbox"
 	"github.com/spf13/cobra"
 )
 
@@ -174,7 +175,11 @@ func runHydrate(cmd *cobra.Command, args []string) error {
 	printRecentGroup("sessions", sessions)
 	fmt.Println()
 
-	fmt.Println("6) Guardrails")
+	fmt.Println("6) Toolbox")
+	printToolbox()
+	fmt.Println()
+
+	fmt.Println("7) Guardrails")
 	fmt.Println("   - Do not run destructive git commands (reset --hard, checkout --) unless asked")
 	fmt.Println("   - Do not edit generated/vendor/build artifacts unless explicitly requested")
 	fmt.Println("   - Do not commit or push without user direction")
@@ -188,6 +193,36 @@ func runHydrate(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// printToolbox lists the capabilities available in this workspace, so an agent
+// learns what exists without gears having to restate the command surface. Each
+// entry points at the tool's own help, which cannot drift from the code.
+func printToolbox() {
+	caps := toolbox.Detect()
+
+	states := make([]string, len(caps))
+	nameWidth, stateWidth := 0, 0
+	for i, c := range caps {
+		states[i] = c.State
+		if c.Detail != "" {
+			states[i] = fmt.Sprintf("%s - %s", c.State, c.Detail)
+		}
+		if len(c.Name) > nameWidth {
+			nameWidth = len(c.Name)
+		}
+		if len(states[i]) > stateWidth {
+			stateWidth = len(states[i])
+		}
+	}
+
+	for i, c := range caps {
+		fmt.Printf("   - %-*s : %-*s → %s\n", nameWidth, c.Name, stateWidth, states[i], c.Help)
+	}
+
+	fmt.Println()
+	fmt.Println("   Run the help for anything above rather than assuming its flags;")
+	fmt.Println("   gears help output is generated from the commands themselves.")
 }
 
 func loadHydrationChecklist(mode string) ([]string, string, []string) {
@@ -549,6 +584,16 @@ func writeHydrationReport(
 	appendRecent(&b, "Stories", stories)
 	appendRecent(&b, "Decisions", decisions)
 	appendRecent(&b, "Sessions", sessions)
+	b.WriteString("\n")
+
+	b.WriteString("## Toolbox\n")
+	for _, c := range toolbox.Detect() {
+		state := c.State
+		if c.Detail != "" {
+			state = fmt.Sprintf("%s - %s", c.State, c.Detail)
+		}
+		b.WriteString(fmt.Sprintf("- %s: %s (`%s`)\n", c.Name, state, c.Help))
+	}
 	b.WriteString("\n")
 
 	b.WriteString("## Guardrails\n")

@@ -16,6 +16,23 @@ import (
 //go:embed templates/.gears
 var templateFS embed.FS
 
+// reportDoorways prints what happened to the agent instruction files, naming
+// only the ones that actually changed so repeat runs stay quiet.
+func reportDoorways(results []agent.DoorwayResult) {
+	for _, r := range results {
+		switch r.Action {
+		case "created":
+			fmt.Printf("✓ Created %s (agent hydration directive)\n", r.Path)
+		case "updated":
+			fmt.Printf("✓ Refreshed the gears block in %s\n", r.Path)
+		case "appended":
+			fmt.Printf("✓ Added a gears block to existing %s\n", r.Path)
+		case "migrated":
+			fmt.Printf("✓ Migrated %s to a managed gears block\n", r.Path)
+		}
+	}
+}
+
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize a new .gears directory in the current project",
@@ -38,9 +55,9 @@ func runInit(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("config exists but failed to load: %w", err)
 		}
 
-		createdInstructions, err := agent.EnsureCopilotInstructions()
+		doorways, err := agent.EnsureAgentDoorways()
 		if err != nil {
-			fmt.Printf("Warning: failed to ensure .github/copilot-instructions.md: %v\n", err)
+			fmt.Printf("Warning: failed to write agent instruction files: %v\n", err)
 		}
 
 		fmt.Println("✓ .gears already initialized")
@@ -51,9 +68,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		} else {
 			fmt.Println("✓ Authenticated: No (run 'gears auth' to authenticate)")
 		}
-		if createdInstructions {
-			fmt.Println("✓ Created .github/copilot-instructions.md with Agent Hydration directive")
-		}
+		reportDoorways(doorways)
 		return nil
 	}
 
@@ -146,9 +161,9 @@ func runInit(cmd *cobra.Command, args []string) error {
 	// Close database connection
 	_ = db.Close()
 
-	createdInstructions, err := agent.EnsureCopilotInstructions()
+	doorways, err := agent.EnsureAgentDoorways()
 	if err != nil {
-		fmt.Printf("Warning: failed to ensure .github/copilot-instructions.md: %v\n", err)
+		fmt.Printf("Warning: failed to write agent instruction files: %v\n", err)
 	}
 
 	fmt.Println()
@@ -158,9 +173,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		fmt.Println("✓ Successfully initialized .gears directory!")
 	}
 	fmt.Printf("✓ Generated workspace ID: %s\n", workspaceID)
-	if createdInstructions {
-		fmt.Println("✓ Created .github/copilot-instructions.md with Agent Hydration directive")
-	}
+	reportDoorways(doorways)
 
 	if !gearsExists {
 		fmt.Println("\nAgent: FIRST, read .gears/gears-init.md for complete onboarding instructions.")

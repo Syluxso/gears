@@ -77,6 +77,31 @@ func LoadSettings() (*Settings, error) {
 	return s, nil
 }
 
+// Describe reports whether Kanboard is usable, without touching the network.
+// Hydration runs on every session start, so it must stay local and instant:
+// a live check would put a network round-trip (and a slow-server hang) in the
+// path of every agent boot.
+func Describe() (configured bool, url string, detail string) {
+	settings, err := LoadSettings()
+	if err == nil {
+		return true, settings.URL, "configured"
+	}
+
+	// Partial config is worth surfacing: it tells the agent which half is missing.
+	partial := &Settings{}
+	if cfg, err := readFileConfig(configFile); err == nil && cfg.Kanboard != nil {
+		partial.URL = cfg.Kanboard.URL
+	}
+	if cfg, err := readFileConfig(localConfigFile); err == nil && cfg.Kanboard != nil && cfg.Kanboard.URL != "" {
+		partial.URL = cfg.Kanboard.URL
+	}
+
+	if partial.URL != "" {
+		return false, partial.URL, "URL set, no API token"
+	}
+	return false, "", "not configured"
+}
+
 func readFileConfig(path string) (*fileConfig, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {

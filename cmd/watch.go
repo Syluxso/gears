@@ -61,11 +61,11 @@ Similar to: php artisan serve, ionic serve, npm run dev`,
 			return fmt.Errorf("failed to initialize database: %w", err)
 		}
 
-		createdInstructions, err := agent.EnsureCopilotInstructions()
+		doorways, err := agent.EnsureAgentDoorways()
 		if err != nil {
-			fmt.Printf("Warning: failed to ensure .github/copilot-instructions.md: %v\n", err)
-		} else if createdInstructions {
-			fmt.Println("✓ Created .github/copilot-instructions.md with Agent Hydration directive")
+			fmt.Printf("Warning: failed to write agent instruction files: %v\n", err)
+		} else {
+			reportDoorways(doorways)
 		}
 
 		// Scan and populate projects

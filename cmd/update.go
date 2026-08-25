@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/Syluxso/gears/internal/agent"
 	"github.com/Syluxso/gears/internal/config"
 	"github.com/Syluxso/gears/internal/db"
 	"github.com/spf13/cobra"
@@ -109,6 +110,20 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to initialize DB schema: %w", err)
 	}
 	fmt.Println("  ✓ DB schema ensured (including backlog_items table)")
+
+	// Refresh the agent instruction files. The gears-owned block is rewritten
+	// in place; anything hand-written outside the markers is preserved, which
+	// is what makes this safe to run on every update.
+	doorways, err := agent.EnsureAgentDoorways()
+	if err != nil {
+		fmt.Printf("  ⚠ Could not write agent instruction files: %v\n", err)
+	} else {
+		for _, r := range doorways {
+			if r.Action != "unchanged" {
+				fmt.Printf("  ✓ %s (%s)\n", r.Path, r.Action)
+			}
+		}
+	}
 
 	fmt.Println("✓ .gears structure and DB updated to match current gears version.")
 	fmt.Println("  Run 'gears consult latest' or 'gears backlog list' to verify.")
