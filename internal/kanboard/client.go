@@ -184,6 +184,11 @@ type Task struct {
 	ColorID     string  `json:"color_id"`
 	SwimlaneID  flexInt `json:"swimlane_id"`
 	URL         string  `json:"url"`
+
+	// Kanboard stores these as a single value per task, not as a ledger of
+	// entries: writing time_spent replaces whatever was there.
+	TimeEstimated float64 `json:"time_estimated"`
+	TimeSpent     float64 `json:"time_spent"`
 }
 
 // Comment is a task comment.

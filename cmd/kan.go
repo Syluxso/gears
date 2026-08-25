@@ -29,6 +29,9 @@ var (
 	kanPriority  int
 	kanTitle     string
 	kanShowClose bool
+	kanAssignee  string
+	kanEstimate  float64
+	kanSpent     float64
 )
 
 var kanCmd = &cobra.Command{
@@ -93,6 +96,9 @@ func init() {
 	kanEditCmd.Flags().StringVar(&kanTitle, "title", "", "New title")
 	kanEditCmd.Flags().StringVar(&kanDesc, "desc", "", "New description")
 	kanEditCmd.Flags().IntVar(&kanPriority, "priority", -1, "New priority")
+	kanEditCmd.Flags().StringVar(&kanAssignee, "assignee", "", "Assign to a user (id, username, or name)")
+	kanEditCmd.Flags().Float64Var(&kanEstimate, "estimate", 0, "Estimated hours")
+	kanEditCmd.Flags().Float64Var(&kanSpent, "spent", 0, "Hours spent (replaces the existing value)")
 
 	for _, c := range []*cobra.Command{kanShowCmd, kanTagCmd, kanCommentCmd,
 		kanCloseCmd, kanReopenCmd, kanRemoveCmd, kanEditCmd} {
@@ -398,6 +404,23 @@ var kanShowCmd = &cobra.Command{
 		if col, err := client.ResolveColumn(task.ProjectID.Int(), strconv.Itoa(task.ColumnID.Int())); err == nil {
 			fmt.Printf("Column:   %s\n", col.Title)
 		}
+		if task.OwnerID.Int() > 0 {
+			assignee := strconv.Itoa(task.OwnerID.Int())
+			if users, err := client.GetAllUsers(); err == nil {
+				for _, u := range users {
+					if u.ID.Int() == task.OwnerID.Int() {
+						assignee = u.Username
+						break
+					}
+				}
+			}
+			fmt.Printf("Assignee: %s\n", assignee)
+		} else {
+			fmt.Printf("Assignee: unassigned\n")
+		}
+		if task.TimeEstimated > 0 || task.TimeSpent > 0 {
+			fmt.Printf("Time:     %gh spent / %gh estimated\n", task.TimeSpent, task.TimeEstimated)
+		}
 		if task.Reference != "" {
 			fmt.Printf("Ref:      %s\n", task.Reference)
 		}
@@ -583,23 +606,51 @@ var kanEditCmd = &cobra.Command{
 		}
 
 		params := map[string]any{"id": task.ID.Int()}
+		changes := []string{}
+
 		if kanTitle != "" {
 			params["title"] = kanTitle
+			changes = append(changes, "title")
 		}
 		if kanDesc != "" {
 			params["description"] = kanDesc
+			changes = append(changes, "description")
 		}
 		if kanPriority >= 0 {
 			params["priority"] = kanPriority
+			changes = append(changes, fmt.Sprintf("priority=%d", kanPriority))
 		}
-		if len(params) == 1 {
-			return fmt.Errorf("nothing to change\n\n  Use --title, --desc, or --priority")
+		if kanAssignee != "" {
+			user, err := client.ResolveUser(kanAssignee)
+			if err != nil {
+				return err
+			}
+			params["owner_id"] = user.ID.Int()
+			changes = append(changes, "assignee="+user.Username)
+		}
+		if cmd.Flags().Changed("estimate") {
+			params["time_estimated"] = kanEstimate
+			changes = append(changes, fmt.Sprintf("estimate=%gh", kanEstimate))
+		}
+		if cmd.Flags().Changed("spent") {
+			params["time_spent"] = kanSpent
+			changes = append(changes, fmt.Sprintf("spent=%gh", kanSpent))
+		}
+
+		if len(changes) == 0 {
+			return fmt.Errorf("nothing to change\n\n  Use --title, --desc, --priority, --assignee, --estimate, or --spent")
 		}
 
 		if err := client.UpdateTask(params); err != nil {
 			return err
 		}
-		fmt.Printf("✓ Updated task [%d]\n", task.ID.Int())
+		fmt.Printf("✓ Updated task [%d]: %s\n", task.ID.Int(), strings.Join(changes, ", "))
+
+		// time_spent is a single overwritten value in Kanboard, not an append-only
+		// ledger, so say plainly that this replaced whatever was there.
+		if cmd.Flags().Changed("spent") {
+			fmt.Println("   Note: time_spent was replaced, not added to.")
+		}
 		return nil
 	},
 }
